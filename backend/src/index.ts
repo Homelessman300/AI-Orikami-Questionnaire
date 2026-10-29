@@ -14,6 +14,8 @@ import {
 } from "./ai/ollama.ts";
 import { extractProject } from "./ai/extractProject.ts";
 import { validateProject } from "./validation/project.ts";
+import { validateQuestionnaire } from "./validation/questionnaire.ts";
+import { generateQuestionnaire } from "./ai/generateQuestionnaire.ts";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -204,6 +206,68 @@ app.post("/api/project/validate", (req, res) => {
 
   return res.json(validateProject(project));
 });
+
+/**
+ * Generate a FHIR Questionnaire from AI Chat history.
+ *
+ * POST /api/questionnaire/generate
+ *
+ * Returns:
+ * - A generated and structurally validated questionnaire.
+ * - Clarification questions when information is missing.
+ * - Validation errors when the AI generates invalid JSON.
+ */
+app.post("/api/questionnaire/generate", async (req, res) => {
+  try {
+    const messages = req.body?.messages;
+
+    if (
+      !Array.isArray(messages) ||
+      !messages.every(
+        (message) =>
+          message &&
+          typeof message === "object" &&
+          (message.role === "user" ||
+            message.role === "assistant") &&
+          typeof message.content === "string"
+      )
+    ) {
+      return res.status(400).json({
+        error: "Invalid conversation messages.",
+      });
+    }
+
+    const result = await generateQuestionnaire(messages);
+
+    if (result.status === "needs_information") {
+      return res.json(result);
+    }
+
+    const validation = validateQuestionnaire(
+      result.questionnaire
+    );
+
+    if (!validation.valid) {
+      return res.status(422).json({
+        status: "invalid",
+        errors: validation.errors,
+      });
+    }
+
+    return res.json({
+      status: "complete",
+      questionnaire: result.questionnaire,
+      validation,
+    });
+  } catch (error) {
+    console.error("Questionnaire generation failed:", error);
+
+    return res.status(500).json({
+      error: "Failed to generate questionnaire.",
+    });
+  }
+});
+
 
 // Start backend server
 app.listen(PORT, () => {
