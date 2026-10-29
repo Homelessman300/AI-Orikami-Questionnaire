@@ -1,17 +1,30 @@
+
 /**
+ * File: ollama.ts
  *
- * This module provides an interface to interact with the Ollama AI model.
- * features:
- * - Sends user messages to the Ollama API for processing.
- * - Receives AI-generated responses from the Ollama API.
- * - Handles errors and provides feedback to the user.
+ * Purpose:
+ * Connects the backend to the local Ollama AI model.
+ *
+ * Supports:
+ * - Normal AI conversations using the Orikami system prompt.
+ * - Custom system prompts for structured JSON extraction.
+ * - Conversation history.
  */
+
 import "dotenv/config";
-import { getSystemPrompt } from "./prompts.ts";
-export interface ChatMessage {
-  role: "user" | "assistant";
+import { getSystemPrompt } from "./prompts.js";
+
+/**
+ * Represents a message sent to Ollama.
+ *
+ * system: Instructions for the AI.
+ * user: A message from the user.
+ * assistant: A previous AI response.
+ */
+export type ChatMessage = {
+  role: "system" | "user" | "assistant";
   content: string;
-}
+};
 
 const OLLAMA_BASE_URL =
   process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
@@ -19,9 +32,30 @@ const OLLAMA_BASE_URL =
 const OLLAMA_MODEL =
   process.env.OLLAMA_MODEL ?? "qwen3:14b";
 
+/**
+ * Sends messages to Ollama and returns the AI response.
+ *
+ * If no custom system prompt is provided, the default
+ * Orikami system prompt is automatically added.
+ */
 export async function askOllama(
   messages: ChatMessage[]
 ): Promise<string> {
+  const hasCustomSystemPrompt = messages.some(
+    (message) => message.role === "system"
+  );
+
+  const ollamaMessages: ChatMessage[] =
+    hasCustomSystemPrompt
+      ? messages
+      : [
+          {
+            role: "system",
+            content: getSystemPrompt(),
+          },
+          ...messages,
+        ];
+
   const response = await fetch(
     `${OLLAMA_BASE_URL}/api/chat`,
     {
@@ -32,13 +66,7 @@ export async function askOllama(
       body: JSON.stringify({
         model: OLLAMA_MODEL,
         stream: false,
-        messages: [
-          {
-            role: "system",
-            content: getSystemPrompt(),
-          },
-          ...messages,
-        ],
+        messages: ollamaMessages,
       }),
     }
   );
@@ -49,11 +77,16 @@ export async function askOllama(
     );
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     message?: {
+      role?: string;
       content?: string;
     };
   };
 
-  return data.message?.content ?? "";
+  if (typeof data.message?.content !== "string") {
+    throw new Error("Invalid response from Ollama");
+  }
+
+  return data.message.content;
 }
