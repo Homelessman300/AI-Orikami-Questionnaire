@@ -139,3 +139,52 @@ export async function extractProject(
 
   return data.project;
 }
+
+/**
+ * Represents the backend project validation result.
+ */
+export type ProjectValidationResult = {
+  valid: boolean;
+  errors: string[];
+};
+
+/**
+ * Sends project configuration to the backend
+ * for validation.
+ *
+ * This function does not save anything to KRANE.
+ */
+export async function validateProject(
+  project: ProjectConfig
+): Promise<ProjectValidationResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/project/validate`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ project }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Project validation failed: ${response.status}`
+    );
+  }
+
+  const data = (await response.json()) as ProjectValidationResult;
+
+  if (
+    typeof data.valid !== "boolean" ||
+    !Array.isArray(data.errors) ||
+    !data.errors.every(
+      (error) => typeof error === "string"
+    )
+  ) {
+    throw new Error("Invalid validation response from backend");
+  }
+
+  return data;
+}

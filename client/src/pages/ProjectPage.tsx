@@ -9,9 +9,8 @@
  * - Displays extracted information in editable fields.
  * - Preserves manual changes when navigating between pages.
  * - Calculates project duration.
- * - Validates required project information.
+ * - Validates project information using the backend API.
  *
- * Does not save anything to KRANE.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -19,6 +18,7 @@ import type { FormEvent } from "react";
 
 import {
   extractProject,
+  validateProject,
   type ChatMessage,
 } from "../services/api";
 
@@ -155,51 +155,42 @@ export default function ProjectPage({
       : null;
 
   /**
-   * Validate project information locally.
-   * This does not submit anything to KRANE.
+   * Validates project configuration using the backend.
+   *
+   * Sends project data to /api/project/validate.
+   * Displays validation errors or a success message.
+   *
+   * Does not save anything to KRANE.
    */
-  function handleSubmit(
+  async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
-    if (!project.name.trim()) {
-      setError("Project name is required.");
-      return;
-    }
+    if (loading) return;
 
-    if (!project.startDate || !project.endDate) {
-      setError("Start date and end date are required.");
-      return;
-    }
-
-    const today = new Date();
-
-    const todayString = [
-      today.getFullYear(),
-      String(today.getMonth() + 1).padStart(2, "0"),
-      String(today.getDate()).padStart(2, "0"),
-    ].join("-");
-
-    if (project.startDate < todayString) {
-      setError("Start date cannot be in the past.");
-      return;
-    }
-
-    if (project.endDate <= project.startDate) {
-      setError("End date must be after start date.");
-      return;
-    }
-
-    if (project.selfEnrollment === null) {
-      setError(
-        "Please select a self-enrollment option."
-      );
-      return;
-    }
-
+    setLoading(true);
     setError("");
-    setSuccess("Project configuration is valid.");
+    setSuccess("");
+
+    try {
+      const result = await validateProject(project);
+
+      if (!result.valid) {
+        setError(result.errors.join(" "));
+        return;
+      }
+
+      setSuccess("Project configuration is valid.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to validate project configuration."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   /**
@@ -251,7 +242,7 @@ export default function ProjectPage({
 
           {loading && (
             <p role="status">
-              Extracting project information...
+              Processing project information...
             </p>
           )}
         </div>
@@ -426,7 +417,9 @@ export default function ProjectPage({
               type="submit"
               disabled={loading}
             >
-              Validate Project
+              {loading
+                ? "Processing..."
+                : "Validate Project"}
             </button>
           </div>
         </form>
