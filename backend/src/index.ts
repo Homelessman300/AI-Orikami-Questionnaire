@@ -1,8 +1,17 @@
-
+/**
+ * 
+ * This is the main entry point for the Orikami AI backend server.
+ * features:
+ * - Provides API endpoints for health checks, Ollama status, and chat functionality.
+ * - Handles incoming chat messages and forwards them to the Ollama AI model.
+ * - Returns AI-generated responses to the client.
+ */
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import { askOllama } from "./ai/ollama.js";
+import {
+  askOllama, type ChatMessage,
+} from "./ai/ollama.ts";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -61,32 +70,45 @@ app.get("/api/ollama/status", async (_req, res) => {
 // Send a message to Ollama
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message } = req.body ?? {};
+    const { message, history = [] } = req.body;
 
-    if (typeof message !== "string" || !message.trim()) {
-      res.status(400).json({
-        error: "Message is required",
+    if (
+      typeof message !== "string" ||
+      !message.trim() ||
+      !Array.isArray(history) ||
+      !history.every(
+        (item: ChatMessage) =>
+          item &&
+          (item.role === "user" ||
+            item.role === "assistant") &&
+          typeof item.content === "string"
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid chat message or history",
       });
-      return;
     }
 
-    const reply = await askOllama(message);
+    const reply = await askOllama([
+      ...history,
+      {
+        role: "user",
+        content: message.trim(),
+      },
+    ]);
 
-    res.json({
+    return res.json({
       success: true,
       model: process.env.OLLAMA_MODEL ?? "qwen3:14b",
       reply,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
+    console.error(error);
 
-    console.error("Ollama chat error:", message);
-
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      error: "Failed to communicate with Ollama",
-      details: message,
+      error: "Failed to generate AI response",
     });
   }
 });

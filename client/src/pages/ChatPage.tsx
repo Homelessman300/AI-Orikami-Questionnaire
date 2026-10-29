@@ -1,4 +1,11 @@
 
+/**
+ * 
+ * Main AI chat interface for Orikami.
+ * feutrues:
+ * - Displays a chat conversation between the user and the AI assistant.
+ * - Allows the user to input messages and receive AI-generated responses. 
+ */
 import { useEffect, useRef, useState } from "react";
 import ChatMessage, {
   type Message,
@@ -50,8 +57,12 @@ export default function ChatPage() {
     setError("");
 
     try {
-      const reply = await sendChatMessage(text);
+      const history = messages.map(({ role, content }) => ({
+  role,
+  content,
+}));
 
+    const reply = await sendChatMessage(text, history);
       const assistantMessage: Message = {
         id: nextId.current++,
         role: "assistant",

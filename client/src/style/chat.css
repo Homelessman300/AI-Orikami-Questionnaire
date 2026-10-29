@@ -228,3 +228,35 @@
     padding: 0 16px;
   }
 }
+/* ========================================
+   Chat Message Markdown Styling
+
+   Used by: components/ChatMessage.tsx
+
+   Purpose:
+   Styles AI-generated Markdown content,
+   including paragraphs, bold text,
+   numbered lists, and bullet points.
+======================================== */
+
+.message-content p {
+  margin: 0 0 10px;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content ol,
+.message-content ul {
+  padding-left: 20px;
+  margin: 10px 0;
+}
+
+.message-content li {
+  margin-bottom: 6px;
+}
+
+.message-content strong {
+  font-weight: 700;
+}

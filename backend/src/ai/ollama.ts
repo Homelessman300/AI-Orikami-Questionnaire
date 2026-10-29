@@ -1,45 +1,59 @@
-
+/**
+ *
+ * This module provides an interface to interact with the Ollama AI model.
+ * features:
+ * - Sends user messages to the Ollama API for processing.
+ * - Receives AI-generated responses from the Ollama API.
+ * - Handles errors and provides feedback to the user.
+ */
 import "dotenv/config";
+import { getSystemPrompt } from "./prompts.ts";
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
-const OLLAMA_URL =
+const OLLAMA_BASE_URL =
   process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
 
-const MODEL =
+const OLLAMA_MODEL =
   process.env.OLLAMA_MODEL ?? "qwen3:14b";
 
-export async function askOllama(prompt: string): Promise<string> {
-  let response: Response;
-
-  try {
-    response = await fetch(`${OLLAMA_URL}/api/generate`, {
+export async function askOllama(
+  messages: ChatMessage[]
+): Promise<string> {
+  const response = await fetch(
+    `${OLLAMA_BASE_URL}/api/chat`,
+    {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: MODEL,
-        prompt,
+        model: OLLAMA_MODEL,
         stream: false,
+        messages: [
+          {
+            role: "system",
+            content: getSystemPrompt(),
+          },
+          ...messages,
+        ],
       }),
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
-
-    console.error("Ollama error:", message);
-    throw new Error(`Failed to communicate with Ollama: ${message}`);
-  }
-  
+    }
+  );
 
   if (!response.ok) {
-    const details = await response.text();
-
     throw new Error(
-      `Ollama HTTP ${response.status}: ${details}`
+      `Ollama request failed: ${response.status}`
     );
   }
 
-  const data = await response.json();
+  const data = await response.json() as {
+    message?: {
+      content?: string;
+    };
+  };
 
-  return data.response;
+  return data.message?.content ?? "";
 }
