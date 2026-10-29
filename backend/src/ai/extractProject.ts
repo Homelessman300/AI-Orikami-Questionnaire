@@ -14,7 +14,7 @@
 import {
   askOllama,
   type ChatMessage,
-} from "./ollama.js";
+} from "./ollama.ts";
 
 /**
  * Project configuration returned by the AI.

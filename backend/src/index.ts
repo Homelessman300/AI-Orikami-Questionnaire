@@ -12,6 +12,7 @@ import cors from "cors";
 import {
   askOllama, type ChatMessage,
 } from "./ai/ollama.ts";
+import { extractProject } from "./ai/extractProject.ts";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -127,6 +128,55 @@ app.get("/", (_req, res) => {
     ],
   });
 });
+
+
+/**
+ * Purpose:
+ * Extract project configuration from the chat conversation.
+ *
+ * Receives:
+ * - Conversation history
+ *
+ * Returns:
+ * - Structured project configuration JSON
+ *
+ * This endpoint does not save anything to KRANE.
+ */
+app.post("/api/project/extract", async (req, res) => {
+  try {
+    const { messages } = req.body;
+
+    // Check that conversation history was provided.
+    if (
+      !Array.isArray(messages) ||
+      messages.length === 0 ||
+      messages.some(
+        (message) =>
+          typeof message !== "object" ||
+          message === null ||
+          !["user", "assistant"].includes(message.role) ||
+          typeof message.content !== "string"
+      )
+    ) {
+      return res.status(400).json({
+        error: "Valid conversation history is required",
+      });
+    }
+
+    // Extract project information using Ollama.
+    const project = await extractProject(messages);
+
+    // Return the extracted configuration to React.
+    return res.json({ project });
+  } catch (error) {
+    console.error("Project extraction failed:", error);
+
+    return res.status(500).json({
+      error: "Failed to extract project configuration",
+    });
+  }
+});
+
 
 // Start backend server
 app.listen(PORT, () => {
