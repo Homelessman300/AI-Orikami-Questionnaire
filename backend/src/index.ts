@@ -13,6 +13,7 @@ import {
   askOllama, type ChatMessage,
 } from "./ai/ollama.ts";
 import { extractProject } from "./ai/extractProject.ts";
+import { validateProject } from "./validation/project.ts";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -176,7 +177,33 @@ app.post("/api/project/extract", async (req, res) => {
     });
   }
 });
+/**
+ * Validates project configuration without saving it.
+ */
+app.post("/api/project/validate", (req, res) => {
+  const project = req.body?.project;
 
+  if (
+    !project ||
+    typeof project !== "object" ||
+    Array.isArray(project) ||
+    typeof project.name !== "string" ||
+    typeof project.description !== "string" ||
+    typeof project.startDate !== "string" ||
+    typeof project.endDate !== "string" ||
+    !(
+      typeof project.selfEnrollment === "boolean" ||
+      project.selfEnrollment === null
+    )
+  ) {
+    return res.status(400).json({
+      valid: false,
+      errors: ["Invalid project configuration structure."],
+    });
+  }
+
+  return res.json(validateProject(project));
+});
 
 // Start backend server
 app.listen(PORT, () => {
