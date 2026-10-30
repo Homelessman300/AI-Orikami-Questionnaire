@@ -20,6 +20,7 @@ import ChatPage from "./pages/ChatPage";
 import ProjectPage from "./pages/ProjectPage";
 import QuestionnairePage from "./pages/QuestionnairePage";
 import SchedulePage from "./pages/SchedulePage";
+import ReviewPage from "./pages/ReviewPage";
 
 import AppNavigation, {
   type Page,
@@ -154,18 +155,15 @@ export default function App() {
             messages={conversation}
           />
         )}
-
-        {/* Review page - to be implemented */}
-        {page === "review" && (
-          <main className="schedule-page">
-            <h1>Review</h1>
-            <p>
-              Review and confirmation will be implemented
-              in a later step.
-            </p>
-          </main>
-        )}
-      </div>
+{/* Review & Confirmation */}
+{page === "review" && (
+  <ReviewPage
+    project={project}
+    questionnaire={questionnaire}
+    onNavigate={setPage}
+  />
+)}
+      </div>  
     </>
   );
 }
