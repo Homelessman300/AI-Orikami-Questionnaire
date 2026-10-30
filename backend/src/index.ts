@@ -504,11 +504,14 @@ app.post("/api/schedule/extract", async (req, res) => {
  */
 startNotificationScheduler();
 
-/**
- * Start backend server.
- */
-app.listen(PORT, () => {
-  console.log(
-    `Backend running on http://localhost:${PORT}`
-  );
-});
+// Export Express app for integration testing
+export default app;
+
+// Only start the server outside the test environment
+if (process.env.NODE_ENV !== "test") {
+  startNotificationScheduler();
+
+  app.listen(PORT, () => {
+    console.log(`Backend running on http://localhost:${PORT}`);
+  });
+}
