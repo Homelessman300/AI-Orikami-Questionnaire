@@ -188,3 +188,81 @@ export async function validateProject(
 
   return data;
 }
+
+/**
+ * Types for AI-generated FHIR questionnaires.
+ */
+export interface FhirQuestionnaireItem {
+  linkId: string;
+  text: string;
+  type: string;
+  required?: boolean;
+  answerOption?: Array<{
+    valueString?: string;
+    valueInteger?: number;
+    valueCoding?: {
+      system?: string;
+      code?: string;
+      display?: string;
+    };
+  }>;
+  item?: FhirQuestionnaireItem[];
+}
+
+export interface FhirQuestionnaire {
+  resourceType: "Questionnaire";
+  status: "draft";
+  title: string;
+  item: FhirQuestionnaireItem[];
+}
+
+export type QuestionnaireGenerationResult =
+  | {
+      status: "complete";
+      questionnaire: FhirQuestionnaire;
+      validation: {
+        valid: boolean;
+        errors: string[];
+      };
+    }
+  | {
+      status: "needs_information";
+      questions: string[];
+    };
+
+/**
+ * Generates a FHIR Questionnaire using Ollama.
+ *
+ * The backend handles AI generation and validation.
+ * React only displays the result.
+ */
+export async function generateQuestionnaire(
+  messages: ChatMessage[]
+): Promise<QuestionnaireGenerationResult> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/questionnaire/generate`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messages }),
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    const details =
+      data &&
+      typeof data === "object" &&
+      "errors" in data &&
+      Array.isArray(data.errors)
+        ? data.errors.join(" ")
+        : `Request failed: ${response.status}`;
+
+    throw new Error(details);
+  }
+
+  return (await response.json()) as QuestionnaireGenerationResult;
+}

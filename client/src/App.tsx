@@ -1,22 +1,27 @@
 
 /**
- * File: App.tsx
- *
  * Purpose:
  * Main application component.
  *
  * Features:
- * - Navigation between AI Chat and Project Configuration.
+ * - Navigation between AI Chat, Project and Questionnaire.
  * - Shared conversation history.
  * - Shared project configuration.
- * - Tracks which conversation has been extracted.
- * - Preserves manually edited project information.
+ * - Shared AI-generated FHIR Questionnaire.
+ * - Tracks which conversation has been processed.
+ * - Preserves information when switching pages.
+ *
  */
 
 import { useState } from "react";
 
 import ChatPage from "./pages/ChatPage";
 import ProjectPage from "./pages/ProjectPage";
+import QuestionnairePage from "./pages/QuestionnairePage";
+
+import AppNavigation, {
+  type Page,
+} from "./components/Appnavigation";
 
 import type { Message } from "./components/ChatMessage";
 
@@ -24,9 +29,12 @@ import {
   initialProjectConfig,
   type ProjectConfig,
 } from "./types/project";
-import AppNavigation, {
-  type Page,
-} from "./components/Appnavigation.tsx";
+
+import type { FhirQuestionnaire } from "./services/api";
+
+/**
+ * Initial AI greeting.
+ */
 const initialMessages: Message[] = [
   {
     id: 1,
@@ -37,24 +45,54 @@ const initialMessages: Message[] = [
 ];
 
 export default function App() {
-  // Controls which page is visible.
+  /**
+   * Current navigation page.
+   */
   const [page, setPage] = useState<Page>("chat");
 
-  // Stores the conversation between page changes.
+  /**
+   * Stores the AI Chat conversation.
+   * Messages are preserved when navigating between pages.
+   */
   const [messages, setMessages] =
     useState<Message[]>(initialMessages);
 
-  // Stores project configuration between page changes.
+  /**
+   * Stores the project configuration.
+   */
   const [project, setProject] =
     useState<ProjectConfig>(initialProjectConfig);
 
-  // Remembers the conversation used for the last extraction.
+  /**
+   * Remembers which conversation was last used
+   * to extract project information.
+   */
   const [
     lastExtractedHistory,
     setLastExtractedHistory,
   ] = useState("");
 
-  // Exclude the initial greeting from AI extraction.
+  /**
+   * Stores the AI-generated FHIR Questionnaire.
+   */
+  const [questionnaire, setQuestionnaire] =
+    useState<FhirQuestionnaire | null>(null);
+
+  /**
+   * Remembers which conversation was last used
+   * to generate a questionnaire.
+   */
+  const [
+    lastGeneratedHistory,
+    setLastGeneratedHistory,
+  ] = useState("");
+
+  /**
+   * Convert chat messages into the format
+   * expected by the backend.
+   *
+   * Exclude the initial AI greeting.
+   */
   const conversation = messages
     .filter((message) => message.id !== 1)
     .map(({ role, content }) => ({
@@ -64,11 +102,13 @@ export default function App() {
 
   return (
     <div>
-  <AppNavigation
-  currentPage={page}
-  onNavigate={setPage}
-/>
+      {/* Main navigation */}
+      <AppNavigation
+        currentPage={page}
+        onNavigate={setPage}
+      />
 
+      {/* AI Chat */}
       {page === "chat" && (
         <ChatPage
           messages={messages}
@@ -76,6 +116,7 @@ export default function App() {
         />
       )}
 
+      {/* Project Configuration */}
       {page === "project" && (
         <ProjectPage
           messages={conversation}
@@ -83,6 +124,17 @@ export default function App() {
           onProjectChange={setProject}
           lastExtractedHistory={lastExtractedHistory}
           onHistoryExtracted={setLastExtractedHistory}
+        />
+      )}
+
+      {/* AI-generated FHIR Questionnaire */}
+      {page === "questionnaire" && (
+        <QuestionnairePage
+          messages={conversation}
+          questionnaire={questionnaire}
+          onQuestionnaireChange={setQuestionnaire}
+          lastGeneratedHistory={lastGeneratedHistory}
+          onHistoryGenerated={setLastGeneratedHistory}
         />
       )}
     </div>

@@ -9,6 +9,7 @@ import "../style/navigation.css";
 export type Page =
   | "chat"
   | "project"
+  | "questionnaire"
   | "schedule"
   | "reminders"
   | "review";
@@ -25,9 +26,14 @@ const navigationItems: {
 }[] = [
   { id: "chat", label: "AI Chat", number: 1 },
   { id: "project", label: "Project", number: 2 },
-  { id: "schedule", label: "Schedule", number: 3 },
-  { id: "reminders", label: "Reminders", number: 4 },
-  { id: "review", label: "Review", number: 5 },
+  {
+    id: "questionnaire",
+    label: "Questionnaire",
+    number: 3,
+  },
+  { id: "schedule", label: "Schedule", number: 4 },
+  { id: "reminders", label: "Reminders", number: 5 },
+  { id: "review", label: "Review", number: 6 },
 ];
 
 export default function AppNavigation({

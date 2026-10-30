@@ -3,58 +3,61 @@
  * File: ollama.ts
  *
  * Purpose:
- * Connects the backend to the local Ollama AI model.
+ * Communicates with the local Ollama AI model.
  *
- * Supports:
- * - Normal AI conversations using the Orikami system prompt.
- * - Custom system prompts for structured JSON extraction.
- * - Conversation history.
+ * Features:
+ * - Supports normal AI Chat.
+ * - Supports structured JSON generation.
+ * - Allows disabling Qwen3 thinking.
+ * - Keeps the model loaded between requests.
  */
 
-import "dotenv/config";
 import { getSystemPrompt } from "./prompts.js";
 
-/**
- * Represents a message sent to Ollama.
- *
- * system: Instructions for the AI.
- * user: A message from the user.
- * assistant: A previous AI response.
- */
 export type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
 };
 
+export type OllamaOptions = {
+  think?: boolean;
+  format?: "json";
+  numPredict?: number;
+};
+
 const OLLAMA_BASE_URL =
-  process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434";
+  process.env.OLLAMA_BASE_URL ??
+  "http://127.0.0.1:11434";
 
 const OLLAMA_MODEL =
   process.env.OLLAMA_MODEL ?? "qwen3:14b";
 
 /**
  * Sends messages to Ollama and returns the AI response.
- *
- * If no custom system prompt is provided, the default
- * Orikami system prompt is automatically added.
  */
 export async function askOllama(
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  options: OllamaOptions = {}
 ): Promise<string> {
-  const hasCustomSystemPrompt = messages.some(
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new Error("At least one message is required.");
+  }
+
+  // Use the default prompt for normal chat unless
+  // the caller provides a custom system prompt.
+  const hasSystemPrompt = messages.some(
     (message) => message.role === "system"
   );
 
-  const ollamaMessages: ChatMessage[] =
-    hasCustomSystemPrompt
-      ? messages
-      : [
-          {
-            role: "system",
-            content: getSystemPrompt(),
-          },
-          ...messages,
-        ];
+  const conversation: ChatMessage[] = hasSystemPrompt
+    ? messages
+    : [
+        {
+          role: "system",
+          content: getSystemPrompt(),
+        },
+        ...messages,
+      ];
 
   const response = await fetch(
     `${OLLAMA_BASE_URL}/api/chat`,
@@ -65,15 +68,34 @@ export async function askOllama(
       },
       body: JSON.stringify({
         model: OLLAMA_MODEL,
+        messages: conversation,
         stream: false,
-        messages: ollamaMessages,
+        keep_alive: "30m",
+
+        ...(options.think !== undefined && {
+          think: options.think,
+        }),
+
+        ...(options.format && {
+          format: options.format,
+        }),
+
+        options: {
+          temperature: options.format === "json" ? 0 : 0.7,
+
+          ...(options.numPredict !== undefined && {
+            num_predict: options.numPredict,
+          }),
+        },
       }),
     }
   );
 
   if (!response.ok) {
+    const errorText = await response.text();
+
     throw new Error(
-      `Ollama request failed: ${response.status}`
+      `Ollama request failed (${response.status}): ${errorText}`
     );
   }
 
@@ -81,12 +103,24 @@ export async function askOllama(
     message?: {
       role?: string;
       content?: string;
+      thinking?: string;
     };
+    done_reason?: string;
   };
 
-  if (typeof data.message?.content !== "string") {
-    throw new Error("Invalid response from Ollama");
+  const content = data.message?.content;
+
+  if (typeof content !== "string" || !content.trim()) {
+    throw new Error(
+      "Ollama returned an empty response."
+    );
   }
 
-  return data.message.content;
+  if (data.done_reason === "length") {
+    throw new Error(
+      "Ollama response was truncated. Increase numPredict."
+    );
+  }
+
+  return content;
 }
