@@ -1,6 +1,6 @@
 
 /**
-* Purpose:
+ * Purpose:
  * Reusable navigation for the Orikami AI Builder.
  */
 
@@ -31,9 +31,21 @@ const navigationItems: {
     label: "Questionnaire",
     number: 3,
   },
-  { id: "schedule", label: "Schedule", number: 4 },
-  { id: "reminders", label: "Reminders", number: 5 },
-  { id: "review", label: "Review", number: 6 },
+  {
+    id: "schedule",
+    label: "Schedule",
+    number: 4,
+  },
+  {
+    id: "reminders",
+    label: "Reminders",
+    number: 5,
+  },
+  {
+    id: "review",
+    label: "Review",
+    number: 6,
+  },
 ];
 
 export default function AppNavigation({
@@ -64,7 +76,9 @@ export default function AppNavigation({
             }`}
             onClick={() => onNavigate(item.id)}
             aria-current={
-              currentPage === item.id ? "step" : undefined
+              currentPage === item.id
+                ? "step"
+                : undefined
             }
           >
             <span className="navigation-number">

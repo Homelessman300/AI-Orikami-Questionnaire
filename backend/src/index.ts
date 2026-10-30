@@ -33,6 +33,12 @@ import {
   startNotificationScheduler,
   createNotification,
 } from "./services/notifications.js";
+import {
+  getSchedule,
+  saveSchedule,
+  validateSchedule,
+  type ScheduleConfig,
+} from "./services/schedules.ts";
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -156,6 +162,12 @@ app.post("/api/chat", async (req, res) => {
  *
  * Backend information.
  */
+
+/**
+ * GET /
+ *
+ * Backend information and available API endpoints.
+ */
 app.get("/", (_req, res) => {
   return res.json({
     name: "Orikami AI Backend",
@@ -168,14 +180,18 @@ app.get("/", (_req, res) => {
       "POST /api/project/extract",
       "POST /api/project/validate",
       "POST /api/questionnaire/generate",
+      "GET /api/schedule",
+      "PUT /api/schedule",
       "GET /api/notifications",
       "PATCH /api/notifications/:id/read",
+
       ...(process.env.NODE_ENV !== "production"
         ? ["POST /api/notifications/test"]
         : []),
     ],
   });
 });
+
 
 /**
  * POST /api/project/extract
@@ -379,6 +395,62 @@ app.patch("/api/notifications/:id/read", (req, res) => {
 
     return res.status(500).json({
       error: "Failed to update notification.",
+    });
+  }
+});
+
+
+/**
+ * GET /api/schedule
+ *
+ * Retrieve saved schedule configuration.
+ */
+app.get("/api/schedule", (_req, res) => {
+  try {
+    return res.json({
+      schedule: getSchedule(),
+    });
+  } catch (error) {
+    console.error("Failed to load schedule:", error);
+
+    return res.status(500).json({
+      error: "Failed to load schedule.",
+    });
+  }
+});
+
+/**
+ * PUT /api/schedule
+ * 
+ * Validate and save schedule configuration.
+ */
+app.put("/api/schedule", (req, res) => {
+  try {
+    const errors = validateSchedule(
+      req.body?.schedule
+    );
+
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        errors,
+      });
+    }
+
+    const schedule = saveSchedule(
+      req.body.schedule as ScheduleConfig
+    );
+
+    return res.json({
+      success: true,
+      schedule,
+    });
+  } catch (error) {
+    console.error("Failed to save schedule:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to save schedule.",
     });
   }
 });

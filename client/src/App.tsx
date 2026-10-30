@@ -4,13 +4,14 @@
  * Main application component.
  *
  * Features:
- * - Navigation between AI Chat, Project and Questionnaire.
+ * - Navigation between AI Chat, Project, Questionnaire,
+ *   Schedule, Reminders and Review.
  * - Shared conversation history.
  * - Shared project configuration.
  * - Shared AI-generated FHIR Questionnaire.
  * - Tracks which conversation has been processed.
  * - Preserves information when switching pages.
- *
+ * - Displays in-app notifications.
  */
 
 import { useState } from "react";
@@ -18,10 +19,13 @@ import { useState } from "react";
 import ChatPage from "./pages/ChatPage";
 import ProjectPage from "./pages/ProjectPage";
 import QuestionnairePage from "./pages/QuestionnairePage";
+import SchedulePage from "./pages/SchedulePage";
 
 import AppNavigation, {
   type Page,
 } from "./components/Appnavigation";
+
+import NotificationBell from "./components/NotificationBell";
 
 import type { Message } from "./components/ChatMessage";
 
@@ -31,7 +35,7 @@ import {
 } from "./types/project";
 
 import type { FhirQuestionnaire } from "./services/api";
-import NotificationBell from "./components/NotificationBell";
+
 /**
  * Initial AI greeting.
  */
@@ -102,46 +106,75 @@ export default function App() {
 
   return (
     <>
-    <div className="notification-header">
-  <NotificationBell />
-</div>
-    <div>
-      {/* Main navigation */}
-      <AppNavigation
-        currentPage={page}
-        onNavigate={setPage}
-      />
+      {/* Notification Bell */}
+      <div className="notification-header">
+        <NotificationBell />
+      </div>
 
-      {/* AI Chat */}
-      {page === "chat" && (
-        <ChatPage
-          messages={messages}
-          onMessagesChange={setMessages}
+      <div>
+        {/* Main Navigation */}
+        <AppNavigation
+          currentPage={page}
+          onNavigate={setPage}
         />
-      )}
 
-      {/* Project Configuration */}
-      {page === "project" && (
-        <ProjectPage
-          messages={conversation}
-          project={project}
-          onProjectChange={setProject}
-          lastExtractedHistory={lastExtractedHistory}
-          onHistoryExtracted={setLastExtractedHistory}
-        />
-      )}
+        {/* AI Chat */}
+        {page === "chat" && (
+          <ChatPage
+            messages={messages}
+            onMessagesChange={setMessages}
+          />
+        )}
 
-      {/* AI-generated FHIR Questionnaire */}
-      {page === "questionnaire" && (
-        <QuestionnairePage
-          messages={conversation}
-          questionnaire={questionnaire}
-          onQuestionnaireChange={setQuestionnaire}
-          lastGeneratedHistory={lastGeneratedHistory}
-          onHistoryGenerated={setLastGeneratedHistory}
-        />
-      )}
-    </div>
+        {/* Project Configuration */}
+        {page === "project" && (
+          <ProjectPage
+            messages={conversation}
+            project={project}
+            onProjectChange={setProject}
+            lastExtractedHistory={lastExtractedHistory}
+            onHistoryExtracted={setLastExtractedHistory}
+          />
+        )}
+
+        {/* AI-generated FHIR Questionnaire */}
+        {page === "questionnaire" && (
+          <QuestionnairePage
+            messages={conversation}
+            questionnaire={questionnaire}
+            onQuestionnaireChange={setQuestionnaire}
+            lastGeneratedHistory={lastGeneratedHistory}
+            onHistoryGenerated={setLastGeneratedHistory}
+          />
+        )}
+
+        {/* Questionnaire Schedule & Reminders */}
+        {page === "schedule" && (
+          <SchedulePage />
+        )}
+
+        {/* Reminders page - to be implemented */}
+        {page === "reminders" && (
+          <main className="schedule-page">
+            <h1>Reminders</h1>
+            <p>
+              Reminder configuration is currently available
+              in the Schedule page.
+            </p>
+          </main>
+        )}
+
+        {/* Review page - to be implemented */}
+        {page === "review" && (
+          <main className="schedule-page">
+            <h1>Review</h1>
+            <p>
+              Review and confirmation will be implemented
+              in a later step.
+            </p>
+          </main>
+        )}
+      </div>
     </>
   );
 }
