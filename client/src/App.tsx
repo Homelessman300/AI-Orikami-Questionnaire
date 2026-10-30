@@ -31,7 +31,7 @@ import {
 } from "./types/project";
 
 import type { FhirQuestionnaire } from "./services/api";
-
+import NotificationBell from "./components/NotificationBell";
 /**
  * Initial AI greeting.
  */
@@ -101,6 +101,10 @@ export default function App() {
     }));
 
   return (
+    <>
+    <div className="notification-header">
+  <NotificationBell />
+</div>
     <div>
       {/* Main navigation */}
       <AppNavigation
@@ -138,5 +142,6 @@ export default function App() {
         />
       )}
     </div>
+    </>
   );
 }

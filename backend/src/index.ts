@@ -1,26 +1,45 @@
+
 /**
- * 
- * This is the main entry point for the Orikami AI backend server.
- * features:
- * - Provides API endpoints for health checks, Ollama status, and chat functionality.
- * - Handles incoming chat messages and forwards them to the Ollama AI model.
- * - Returns AI-generated responses to the client.
+ * Main entry point for the Orikami AI backend server.
+ *
+ * Features:
+ * - Health check
+ * - Ollama connection status
+ * - AI chat
+ * - Project extraction and validation
+ * - FHIR Questionnaire generation and validation
+ * - In-app notifications
+ * - Automatic notification scheduler
+ * - Development-only notification testing
  */
+
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+
 import {
-  askOllama, type ChatMessage,
+  askOllama,
+  type ChatMessage,
 } from "./ai/ollama.ts";
+
 import { extractProject } from "./ai/extractProject.ts";
 import { validateProject } from "./validation/project.ts";
 import { validateQuestionnaire } from "./validation/questionnaire.ts";
 import { generateQuestionnaire } from "./ai/generateQuestionnaire.ts";
 
+import {
+  getNotifications,
+  markNotificationRead,
+  startNotificationScheduler,
+  createNotification,
+} from "./services/notifications.js";
+
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
 
-// Middleware must be registered before routes
+/**
+ * Middleware
+ */
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -29,15 +48,23 @@ app.use(
 
 app.use(express.json());
 
-// Check whether the backend is running
+/**
+ * GET /api/health
+ *
+ * Check whether the backend is running.
+ */
 app.get("/api/health", (_req, res) => {
-  res.json({
+  return res.json({
     status: "ok",
     message: "Orikami AI Backend is running",
   });
 });
 
-// Check whether Ollama is reachable
+/**
+ * GET /api/ollama/status
+ *
+ * Check whether Ollama is reachable.
+ */
 app.get("/api/ollama/status", async (_req, res) => {
   try {
     const ollamaUrl =
@@ -52,18 +79,21 @@ app.get("/api/ollama/status", async (_req, res) => {
 
     const data = await response.json();
 
-    res.json({
+    return res.json({
       connected: true,
-      configuredModel: process.env.OLLAMA_MODEL ?? "qwen3:14b",
+      configuredModel:
+        process.env.OLLAMA_MODEL ?? "qwen3:14b",
       models: data.models,
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Unknown error";
+      error instanceof Error
+        ? error.message
+        : "Unknown error";
 
     console.error("Ollama status error:", message);
 
-    res.status(503).json({
+    return res.status(503).json({
       connected: false,
       error: "Cannot connect to Ollama",
       details: message,
@@ -71,7 +101,11 @@ app.get("/api/ollama/status", async (_req, res) => {
   }
 });
 
-// Send a message to Ollama
+/**
+ * POST /api/chat
+ *
+ * Send a message to Ollama.
+ */
 app.post("/api/chat", async (req, res) => {
   try {
     const { message, history = [] } = req.body;
@@ -108,7 +142,7 @@ app.post("/api/chat", async (req, res) => {
       reply,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Chat generation failed:", error);
 
     return res.status(500).json({
       success: false,
@@ -117,10 +151,13 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-
- // Homepage route
+/**
+ * GET /
+ *
+ * Backend information.
+ */
 app.get("/", (_req, res) => {
-  res.json({
+  return res.json({
     name: "Orikami AI Backend",
     status: "running",
     model: process.env.OLLAMA_MODEL ?? "qwen3:14b",
@@ -128,28 +165,29 @@ app.get("/", (_req, res) => {
       "GET /api/health",
       "GET /api/ollama/status",
       "POST /api/chat",
+      "POST /api/project/extract",
+      "POST /api/project/validate",
+      "POST /api/questionnaire/generate",
+      "GET /api/notifications",
+      "PATCH /api/notifications/:id/read",
+      ...(process.env.NODE_ENV !== "production"
+        ? ["POST /api/notifications/test"]
+        : []),
     ],
   });
 });
 
-
 /**
- * Purpose:
- * Extract project configuration from the chat conversation.
+ * POST /api/project/extract
  *
- * Receives:
- * - Conversation history
+ * Extract project configuration from AI Chat history.
  *
- * Returns:
- * - Structured project configuration JSON
- *
- * This endpoint does not save anything to KRANE.
+ * Does not save anything to KRANE.
  */
 app.post("/api/project/extract", async (req, res) => {
   try {
     const { messages } = req.body;
 
-    // Check that conversation history was provided.
     if (
       !Array.isArray(messages) ||
       messages.length === 0 ||
@@ -166,10 +204,8 @@ app.post("/api/project/extract", async (req, res) => {
       });
     }
 
-    // Extract project information using Ollama.
     const project = await extractProject(messages);
 
-    // Return the extracted configuration to React.
     return res.json({ project });
   } catch (error) {
     console.error("Project extraction failed:", error);
@@ -179,8 +215,11 @@ app.post("/api/project/extract", async (req, res) => {
     });
   }
 });
+
 /**
- * Validates project configuration without saving it.
+ * POST /api/project/validate
+ *
+ * Validate project configuration without saving it.
  */
 app.post("/api/project/validate", (req, res) => {
   const project = req.body?.project;
@@ -208,14 +247,12 @@ app.post("/api/project/validate", (req, res) => {
 });
 
 /**
- * Generate a FHIR Questionnaire from AI Chat history.
- *
  * POST /api/questionnaire/generate
  *
- * Returns:
- * - A generated and structurally validated questionnaire.
- * - Clarification questions when information is missing.
- * - Validation errors when the AI generates invalid JSON.
+ * Generate and validate a FHIR Questionnaire
+ * using AI Chat history.
+ *
+ * Does not save anything to KRANE.
  */
 app.post("/api/questionnaire/generate", async (req, res) => {
   try {
@@ -260,7 +297,10 @@ app.post("/api/questionnaire/generate", async (req, res) => {
       validation,
     });
   } catch (error) {
-    console.error("Questionnaire generation failed:", error);
+    console.error(
+      "Questionnaire generation failed:",
+      error
+    );
 
     return res.status(500).json({
       error: "Failed to generate questionnaire.",
@@ -268,8 +308,94 @@ app.post("/api/questionnaire/generate", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/notifications
+ *
+ * Retrieve notifications.
+ */
+app.get("/api/notifications", (_req, res) => {
+  return res.json({
+    notifications: getNotifications(),
+  });
+});
 
-// Start backend server
+/**
+ * POST /api/notifications/test
+ *
+ * Create a notification immediately for testing.
+ *
+ * This endpoint is only available outside production.
+ * It should not be exposed to untrusted users.
+ */
+if (process.env.NODE_ENV !== "production") {
+  app.post("/api/notifications/test", (_req, res) => {
+    try {
+      const notification = createNotification(
+        "Questionnaire Reminder",
+        "Your questionnaire is ready to complete."
+      );
+
+      return res.json({
+        success: true,
+        notification,
+      });
+    } catch (error) {
+      console.error(
+        "Test notification creation failed:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        error: "Failed to create test notification.",
+      });
+    }
+  });
+}
+
+/**
+ * PATCH /api/notifications/:id/read
+ *
+ * Mark an existing notification as read.
+ */
+app.patch("/api/notifications/:id/read", (req, res) => {
+  try {
+    const updated = markNotificationRead(req.params.id);
+
+    if (!updated) {
+      return res.status(404).json({
+        error: "Notification not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error(
+      "Failed to mark notification as read:",
+      error
+    );
+
+    return res.status(500).json({
+      error: "Failed to update notification.",
+    });
+  }
+});
+
+/**
+ * Start the notification scheduler.
+ *
+ * The current scheduler creates demonstration reminders.
+ * Later, it will use saved questionnaire schedules.
+ */
+startNotificationScheduler();
+
+/**
+ * Start backend server.
+ */
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(
+    `Backend running on http://localhost:${PORT}`
+  );
 });

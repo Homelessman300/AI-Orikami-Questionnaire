@@ -1,0 +1,19 @@
+{
+  "notifications": [
+    {
+      "id": "9a5ab3ed-8a38-4673-bc21-4cc9dd6fd878",
+      "title": "Questionnaire Reminder",
+      "message": "Your questionnaire is ready to complete.",
+      "createdAt": "2026-10-30T04:31:27.536Z",
+      "read": false
+    },
+    {
+      "id": "a25885a5-202a-4359-b776-a837415272be",
+      "title": "Questionnaire reminder",
+      "message": "A questionnaire is available to complete.",
+      "createdAt": "2026-10-30T03:58:00.014Z",
+      "read": false
+    }
+  ],
+  "lastReminderDate": "2026-10-30"
+}
