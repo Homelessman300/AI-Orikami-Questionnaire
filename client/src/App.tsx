@@ -150,18 +150,9 @@ export default function App() {
 
         {/* Questionnaire Schedule & Reminders */}
         {page === "schedule" && (
-          <SchedulePage />
-        )}
-
-        {/* Reminders page - to be implemented */}
-        {page === "reminders" && (
-          <main className="schedule-page">
-            <h1>Reminders</h1>
-            <p>
-              Reminder configuration is currently available
-              in the Schedule page.
-            </p>
-          </main>
+          <SchedulePage 
+            messages={conversation}
+          />
         )}
 
         {/* Review page - to be implemented */}

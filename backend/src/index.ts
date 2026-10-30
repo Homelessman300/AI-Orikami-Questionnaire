@@ -26,6 +26,7 @@ import { extractProject } from "./ai/extractProject.ts";
 import { validateProject } from "./validation/project.ts";
 import { validateQuestionnaire } from "./validation/questionnaire.ts";
 import { generateQuestionnaire } from "./ai/generateQuestionnaire.ts";
+import { extractSchedule } from "./ai/extractSchedule.ts";
 
 import {
   getNotifications,
@@ -454,6 +455,46 @@ app.put("/api/schedule", (req, res) => {
     });
   }
 });
+
+/**
+ * POST /api/schedule/extract
+ *
+ * Extract schedule configuration using Ollama.
+ * Does not save the schedule.
+ */
+app.post("/api/schedule/extract", async (req, res) => {
+  try {
+    const messages = req.body?.messages;
+
+    if (
+      !Array.isArray(messages) ||
+      messages.length === 0 ||
+      !messages.every(
+        (message) =>
+          message &&
+          typeof message === "object" &&
+          (message.role === "user" ||
+            message.role === "assistant") &&
+          typeof message.content === "string"
+      )
+    ) {
+      return res.status(400).json({
+        error: "Valid conversation history is required.",
+      });
+    }
+
+    const result = await extractSchedule(messages);
+
+    return res.json(result);
+  } catch (error) {
+    console.error("Schedule extraction failed:", error);
+
+    return res.status(500).json({
+      error: "Failed to extract schedule configuration.",
+    });
+  }
+});
+
 
 /**
  * Start the notification scheduler.

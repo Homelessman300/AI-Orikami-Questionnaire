@@ -1,4 +1,13 @@
 
+/**
+ * File: shedule.css
+ *
+ * Purpose:
+ * Styling for the Schedule & Reminders page.
+ */
+
+/* Page layout */
+
 .schedule-page {
   max-width: 900px;
   margin: 0 auto;
@@ -21,6 +30,8 @@
   line-height: 1.6;
 }
 
+/* General sections */
+
 .schedule-section {
   margin-bottom: 24px;
   padding: 24px;
@@ -33,6 +44,8 @@
   margin: 0 0 22px;
   font-size: 20px;
 }
+
+/* Form fields */
 
 .schedule-field {
   display: flex;
@@ -64,30 +77,12 @@
   outline-offset: 1px;
 }
 
+/* Date fields */
+
 .schedule-date-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-}
-
-.schedule-weekdays {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.schedule-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.schedule-checkbox input {
-  width: 16px;
-  height: 16px;
-  accent-color: #1976d2;
 }
 
 .schedule-date-add {
@@ -97,6 +92,7 @@
 
 .schedule-date-add input {
   flex: 1;
+  min-width: 0;
 }
 
 .schedule-date-add button,
@@ -124,10 +120,123 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 10px 12px;
   background: #f8fafc;
   border-radius: 8px;
 }
+
+/* Weekday selection */
+
+.schedule-weekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.schedule-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.schedule-checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: #1976d2;
+}
+
+/* AI schedule generation */
+
+.schedule-ai-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+}
+
+.schedule-ai-section h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #1e293b;
+}
+
+.schedule-ai-section > p {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.schedule-ai-button {
+  align-self: flex-start;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #1976d2;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.schedule-ai-button:hover:not(:disabled) {
+  background: #1565c0;
+}
+
+.schedule-ai-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.schedule-ai-hint {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.schedule-ai-message {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #eaf3ff;
+  color: #1d4ed8;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.schedule-ai-missing {
+  padding: 14px 16px;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 14px;
+}
+
+.schedule-ai-missing strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.schedule-ai-missing ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.schedule-ai-missing li {
+  margin-bottom: 4px;
+}
+
+/* Reminder settings */
+
+.schedule-reminder-field {
+  margin-top: 20px;
+}
+
+/* Validation errors */
 
 .schedule-errors {
   padding: 16px;
@@ -142,12 +251,16 @@
   margin-bottom: 0;
 }
 
+/* Success message */
+
 .schedule-success {
   padding: 14px;
   background: #ecfdf5;
   color: #065f46;
   border-radius: 8px;
 }
+
+/* Action buttons */
 
 .schedule-actions {
   display: flex;
@@ -165,9 +278,16 @@
   cursor: pointer;
 }
 
-.schedule-save-button:hover {
+.schedule-save-button:hover:not(:disabled) {
   background: #1565c0;
 }
+
+.schedule-save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive layout */
 
 @media (max-width: 600px) {
   .schedule-page {
@@ -192,5 +312,10 @@
 
   .schedule-save-button {
     width: 100%;
+  }
+
+  .schedule-ai-button {
+    width: 100%;
+    align-self: stretch;
   }
 }

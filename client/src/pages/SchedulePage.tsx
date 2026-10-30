@@ -1,11 +1,33 @@
 
+/**
+ * File: SchedulePage.tsx
+ *
+ * Purpose:
+ * Configure questionnaire frequency, availability,
+ * and reminder settings.
+ *
+ * Features:
+ * - Manual schedule configuration
+ * - AI extraction from chat history
+ * - Schedule validation
+ * - Save configuration to backend
+ * - Local storage persistence
+ */
+
 import { useState } from "react";
+
 import {
   defaultSchedule,
   type ScheduleConfig,
   type ScheduleFrequency,
   type ReminderFrequency,
 } from "../types/schedule";
+
+import {
+  extractScheduleFromChat,
+  type ChatMessage,
+} from "../services/api";
+
 import "../style/shedule.css";
 
 const STORAGE_KEY = "orikami-schedule";
@@ -20,6 +42,13 @@ const weekdays = [
   { value: 0, label: "Sunday" },
 ];
 
+type SchedulePageProps = {
+  messages: ChatMessage[];
+};
+
+/**
+ * Load the last locally saved schedule.
+ */
 function loadSchedule(): ScheduleConfig {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -37,15 +66,31 @@ function loadSchedule(): ScheduleConfig {
   return { ...defaultSchedule };
 }
 
-export default function SchedulePage() {
+export default function SchedulePage({
+  messages,
+}: SchedulePageProps) {
   const [schedule, setSchedule] = useState<ScheduleConfig>(
     loadSchedule
   );
 
   const [errors, setErrors] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
-  const [specificDateInput, setSpecificDateInput] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
+  const [specificDateInput, setSpecificDateInput] =
+    useState("");
+
+  // AI extraction states
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionMessage, setExtractionMessage] =
+    useState("");
+  const [missingFields, setMissingFields] = useState<
+    string[]
+  >([]);
+
+  /**
+   * Update a schedule field.
+   */
   function updateSchedule<K extends keyof ScheduleConfig>(
     field: K,
     value: ScheduleConfig[K]
@@ -59,6 +104,9 @@ export default function SchedulePage() {
     setErrors([]);
   }
 
+  /**
+   * Toggle a weekday.
+   */
   function toggleWeekday(day: number) {
     const updated = schedule.weekdays.includes(day)
       ? schedule.weekdays.filter((value) => value !== day)
@@ -67,6 +115,9 @@ export default function SchedulePage() {
     updateSchedule("weekdays", updated);
   }
 
+  /**
+   * Add a specific availability date.
+   */
   function addSpecificDate() {
     if (!specificDateInput) return;
 
@@ -82,13 +133,109 @@ export default function SchedulePage() {
     setSpecificDateInput("");
   }
 
+  /**
+   * Remove a specific availability date.
+   */
   function removeSpecificDate(date: string) {
     updateSchedule(
       "specificDates",
-      schedule.specificDates.filter((value) => value !== date)
+      schedule.specificDates.filter(
+        (value) => value !== date
+      )
     );
   }
 
+  /**
+   * Extract schedule settings from AI Chat.
+   *
+   * Generated settings are applied to the form
+   * but are NOT saved automatically.
+   */
+  async function handleGenerateFromChat() {
+    if (messages.length === 0) {
+      setExtractionMessage(
+        "Describe your questionnaire schedule in AI Chat first."
+      );
+      return;
+    }
+
+    setIsExtracting(true);
+    setExtractionMessage("");
+    setMissingFields([]);
+    setErrors([]);
+
+    try {
+      const result = await extractScheduleFromChat(messages);
+      const extracted = result.schedule;
+
+      setSchedule((current) => ({
+        ...current,
+
+        ...(extracted.frequency
+          ? { frequency: extracted.frequency }
+          : {}),
+
+        ...(extracted.startDate
+          ? { startDate: extracted.startDate }
+          : {}),
+
+        ...(extracted.endDate
+          ? { endDate: extracted.endDate }
+          : {}),
+
+        ...(extracted.availableAt
+          ? { availableAt: extracted.availableAt }
+          : {}),
+
+        ...(extracted.weekdays !== undefined
+          ? { weekdays: extracted.weekdays }
+          : {}),
+
+        ...(extracted.specificDates !== undefined
+          ? { specificDates: extracted.specificDates }
+          : {}),
+
+        ...(extracted.remindersEnabled !== undefined
+          ? {
+              remindersEnabled:
+                extracted.remindersEnabled,
+            }
+          : {}),
+
+        ...(extracted.reminderFrequency !== undefined
+          ? {
+              reminderFrequency:
+                extracted.reminderFrequency,
+            }
+          : {}),
+      }));
+
+      setSaved(false);
+      setMissingFields(result.missingFields);
+
+      if (result.status === "complete") {
+        setExtractionMessage(
+          "Schedule generated successfully. Review the settings before saving."
+        );
+      } else {
+        setExtractionMessage(
+          "Schedule partially generated. Please complete or correct the missing information."
+        );
+      }
+    } catch (error) {
+      setExtractionMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to generate schedule."
+      );
+    } finally {
+      setIsExtracting(false);
+    }
+  }
+
+  /**
+   * Validate the current schedule form.
+   */
   function validateSchedule(): string[] {
     const validationErrors: string[] = [];
 
@@ -110,8 +257,14 @@ export default function SchedulePage() {
       );
     }
 
-    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(schedule.availableAt)) {
-      validationErrors.push("Enter a valid availability time.");
+    if (
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(
+        schedule.availableAt
+      )
+    ) {
+      validationErrors.push(
+        "Enter a valid availability time."
+      );
     }
 
     if (
@@ -148,68 +301,141 @@ export default function SchedulePage() {
     return validationErrors;
   }
 
- 
-async function handleSave() {
-  const validationErrors = validateSchedule();
+  /**
+   * Save the confirmed schedule to the backend.
+   */
+  async function handleSave() {
+    const validationErrors = validateSchedule();
 
-  setErrors(validationErrors);
+    setErrors(validationErrors);
 
-  if (validationErrors.length > 0) {
-    setSaved(false);
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      "http://localhost:3000/api/schedule",
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ schedule }),
-      }
-    );
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      setErrors(
-        result.errors ??
-          [result.error ?? "Failed to save schedule."]
-      );
+    if (validationErrors.length > 0) {
       setSaved(false);
       return;
     }
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(schedule)
-    );
-
-    setSaved(true);
-  } catch (error) {
-    console.error("Schedule save failed:", error);
-
-    setErrors([
-      "Cannot connect to the backend server.",
-    ]);
-
+    setIsSaving(true);
     setSaved(false);
-  }
-}
 
+    try {
+      const response = await fetch(
+        "http://localhost:3000/api/schedule",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ schedule }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setErrors(
+          Array.isArray(result.errors)
+            ? result.errors
+            : [
+                result.error ??
+                  "Failed to save schedule.",
+              ]
+        );
+        return;
+      }
+
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(schedule)
+      );
+
+      setSaved(true);
+      setMissingFields([]);
+      setExtractionMessage("");
+    } catch (error) {
+      console.error("Schedule save failed:", error);
+
+      setErrors([
+        "Cannot connect to the backend server.",
+      ]);
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   return (
     <main className="schedule-page">
+      {/* Page header */}
       <header className="schedule-page-header">
         <h1>Schedule & Reminders</h1>
+
         <p>
-          Configure when participants can access questionnaires
-          and when they should receive reminders.
+          Configure when participants can access
+          questionnaires and when they should receive
+          reminders.
         </p>
       </header>
 
+      {/* AI generation */}
+      <section className="schedule-section schedule-ai-section">
+        <h2>Generate Schedule with AI</h2>
+
+        <p>
+          Describe the questionnaire schedule in AI Chat,
+          then generate the configuration automatically.
+        </p>
+
+        <button
+          type="button"
+          className="schedule-ai-button"
+          onClick={handleGenerateFromChat}
+          disabled={
+            isExtracting ||
+            isSaving ||
+            messages.length === 0
+          }
+        >
+          {isExtracting
+            ? "Generating Schedule..."
+            : "Generate from AI Chat"}
+        </button>
+
+        {messages.length === 0 && (
+          <p className="schedule-ai-hint">
+            No chat messages yet. Describe your schedule
+            in AI Chat first.
+          </p>
+        )}
+
+        {extractionMessage && (
+          <p
+            className="schedule-ai-message"
+            role="status"
+          >
+            {extractionMessage}
+          </p>
+        )}
+
+        {missingFields.length > 0 && (
+          <div
+            className="schedule-ai-missing"
+            role="alert"
+          >
+            <strong>
+              Missing or invalid information:
+            </strong>
+
+            <ul>
+              {missingFields.map((field, index) => (
+                <li key={`${field}-${index}`}>
+                  {field}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      {/* Questionnaire scheduling */}
       <section className="schedule-section">
         <h2>Questionnaire Schedule</h2>
 
@@ -231,10 +457,13 @@ async function handleSave() {
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
-            <option value="specific">Specific dates</option>
+            <option value="specific">
+              Specific dates
+            </option>
           </select>
         </div>
 
+        {/* Weekly schedule */}
         {schedule.frequency === "weekly" && (
           <div className="schedule-field">
             <label>Days of the week</label>
@@ -262,6 +491,7 @@ async function handleSave() {
           </div>
         )}
 
+        {/* Specific dates */}
         {schedule.frequency === "specific" && (
           <div className="schedule-field">
             <label htmlFor="specific-date">
@@ -274,7 +504,9 @@ async function handleSave() {
                 type="date"
                 value={specificDateInput}
                 onChange={(event) =>
-                  setSpecificDateInput(event.target.value)
+                  setSpecificDateInput(
+                    event.target.value
+                  )
                 }
               />
 
@@ -308,6 +540,7 @@ async function handleSave() {
           </div>
         )}
 
+        {/* Availability dates */}
         <div className="schedule-date-grid">
           <div className="schedule-field">
             <label htmlFor="schedule-start">
@@ -346,6 +579,7 @@ async function handleSave() {
           </div>
         </div>
 
+        {/* Availability time */}
         <div className="schedule-field">
           <label htmlFor="schedule-time">
             Available at
@@ -365,6 +599,7 @@ async function handleSave() {
         </div>
       </section>
 
+      {/* Reminder configuration */}
       <section className="schedule-section">
         <h2>Reminders</h2>
 
@@ -384,7 +619,7 @@ async function handleSave() {
         </label>
 
         {schedule.remindersEnabled && (
-          <div className="schedule-field">
+          <div className="schedule-field schedule-reminder-field">
             <label htmlFor="reminder-frequency">
               Reminder frequency
             </label>
@@ -415,31 +650,47 @@ async function handleSave() {
         )}
       </section>
 
+      {/* Validation errors */}
       {errors.length > 0 && (
-        <div className="schedule-errors" role="alert">
-          <strong>Please fix the following:</strong>
+        <div
+          className="schedule-errors"
+          role="alert"
+        >
+          <strong>
+            Please fix the following:
+          </strong>
 
           <ul>
-            {errors.map((error) => (
-              <li key={error}>{error}</li>
+            {errors.map((error, index) => (
+              <li key={`${error}-${index}`}>
+                {error}
+              </li>
             ))}
           </ul>
         </div>
       )}
 
+      {/* Save success */}
       {saved && (
-        <p className="schedule-success" role="status">
+        <p
+          className="schedule-success"
+          role="status"
+        >
           Schedule configuration saved successfully.
         </p>
       )}
 
+      {/* Save action */}
       <div className="schedule-actions">
         <button
           type="button"
           className="schedule-save-button"
           onClick={handleSave}
+          disabled={isSaving || isExtracting}
         >
-          Save Configuration
+          {isSaving
+            ? "Saving..."
+            : "Save Configuration"}
         </button>
       </div>
     </main>

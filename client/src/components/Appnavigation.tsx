@@ -11,7 +11,6 @@ export type Page =
   | "project"
   | "questionnaire"
   | "schedule"
-  | "reminders"
   | "review";
 
 type AppNavigationProps = {
@@ -36,15 +35,11 @@ const navigationItems: {
     label: "Schedule",
     number: 4,
   },
-  {
-    id: "reminders",
-    label: "Reminders",
-    number: 5,
-  },
+
   {
     id: "review",
     label: "Review",
-    number: 6,
+    number: 5,
   },
 ];
 

@@ -1,6 +1,5 @@
 
 /**
- * File: extractProject.ts
  *
  * Purpose:
  * Extracts project configuration from an AI conversation.

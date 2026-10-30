@@ -1,7 +1,5 @@
 
 /**
- * File: api.ts
- *
  * Purpose:
  * Handles communication between the React frontend
  * and the Express backend.
@@ -10,10 +8,22 @@
  * - Sends messages to the AI chat.
  * - Maintains conversation history.
  * - Extracts project configuration using Ollama.
+ * - Validates project configuration.
+ * - Generates FHIR questionnaires.
+ * - Extracts questionnaire schedules using Ollama.
  *
+ * Note:
+ * AI extraction does not automatically save
+ * projects, questionnaires, or schedules.
  */
 
 import type { ProjectConfig } from "../types/project";
+import type { ScheduleConfig } from "../types/schedule";
+
+/**
+ * Backend API base URL.
+ */
+const API_BASE_URL = "http://localhost:3000";
 
 /**
  * Represents a message in the AI conversation.
@@ -42,15 +52,10 @@ type ExtractProjectResponse = {
 };
 
 /**
- * Backend API base URL.
- */
-const API_BASE_URL = "http://localhost:3000";
-
-/**
  * Sends a message to the AI chat backend.
  *
- * @param message - The new message entered by the user.
- * @param history - Previous messages in the conversation.
+ * @param message - New message entered by the user.
+ * @param history - Previous conversation messages.
  *
  * @returns The AI-generated response.
  */
@@ -95,11 +100,6 @@ export async function sendChatMessage(
  * The backend sends the conversation to Ollama,
  * which returns structured project information.
  *
- * @param messages - Conversation history.
- *
- * @returns Extracted project configuration.
- *
- * Note:
  * This function does not validate or save
  * the project to KRANE.
  */
@@ -130,7 +130,8 @@ export async function extractProject(
 
   if (
     typeof data.project !== "object" ||
-    data.project === null
+    data.project === null ||
+    Array.isArray(data.project)
   ) {
     throw new Error(
       "Invalid project configuration response"
@@ -174,7 +175,8 @@ export async function validateProject(
     );
   }
 
-  const data = (await response.json()) as ProjectValidationResult;
+  const data =
+    (await response.json()) as ProjectValidationResult;
 
   if (
     typeof data.valid !== "boolean" ||
@@ -183,7 +185,9 @@ export async function validateProject(
       (error) => typeof error === "string"
     )
   ) {
-    throw new Error("Invalid validation response from backend");
+    throw new Error(
+      "Invalid validation response from backend"
+    );
   }
 
   return data;
@@ -197,15 +201,18 @@ export interface FhirQuestionnaireItem {
   text: string;
   type: string;
   required?: boolean;
+
   answerOption?: Array<{
     valueString?: string;
     valueInteger?: number;
+
     valueCoding?: {
       system?: string;
       code?: string;
       display?: string;
     };
   }>;
+
   item?: FhirQuestionnaireItem[];
 }
 
@@ -216,6 +223,9 @@ export interface FhirQuestionnaire {
   item: FhirQuestionnaireItem[];
 }
 
+/**
+ * Result returned by questionnaire generation.
+ */
 export type QuestionnaireGenerationResult =
   | {
       status: "complete";
@@ -265,4 +275,98 @@ export async function generateQuestionnaire(
   }
 
   return (await response.json()) as QuestionnaireGenerationResult;
+}
+
+/**
+ * Represents the result of AI schedule extraction.
+ *
+ * "complete":
+ * All required schedule information was extracted
+ * and validated by the backend.
+ *
+ * "needs_information":
+ * Some schedule fields are missing or invalid.
+ */
+export type ScheduleExtractionResult = {
+  status: "complete" | "needs_information";
+  schedule: Partial<ScheduleConfig>;
+  missingFields: string[];
+};
+
+/**
+ * Extracts questionnaire scheduling information
+ * from the AI Chat conversation.
+ *
+ * The backend uses Ollama to extract:
+ * - Questionnaire frequency.
+ * - Start and end dates.
+ * - Availability time.
+ * - Selected weekdays or specific dates.
+ * - Reminder settings.
+ *
+ * The extracted schedule is returned to React
+ * for review and confirmation.
+ *
+ * This function does not save the schedule.
+ */
+export async function extractScheduleFromChat(
+  messages: ChatMessage[]
+): Promise<ScheduleExtractionResult> {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new Error(
+      "Describe your questionnaire schedule in AI Chat first."
+    );
+  }
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/schedule/extract`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messages }),
+    }
+  );
+
+  if (!response.ok) {
+    const data: unknown = await response
+      .json()
+      .catch(() => null);
+
+    const message =
+      data &&
+      typeof data === "object" &&
+      "error" in data &&
+      typeof data.error === "string"
+        ? data.error
+        : `Schedule extraction failed: ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  const data: unknown = await response.json();
+
+  if (
+    !data ||
+    typeof data !== "object" ||
+    !("status" in data) ||
+    (data.status !== "complete" &&
+      data.status !== "needs_information") ||
+    !("schedule" in data) ||
+    !data.schedule ||
+    typeof data.schedule !== "object" ||
+    Array.isArray(data.schedule) ||
+    !("missingFields" in data) ||
+    !Array.isArray(data.missingFields) ||
+    !data.missingFields.every(
+      (field) => typeof field === "string"
+    )
+  ) {
+    throw new Error(
+      "Invalid schedule extraction response from backend."
+    );
+  }
+
+  return data as ScheduleExtractionResult;
 }
